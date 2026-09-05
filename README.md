@@ -31,18 +31,18 @@ Built for the **Somnia × DreamDEX Event Contracts Hackathon**.
 └─────────────────┘       └─────────────────┘       └────────┬────────┘
                                                              │
 ┌─────────────────┐       ┌─────────────────┐                │
-│ 6. Story Resurface│ ◀───│ 5. Market Settles│ ◀──────────────┘
-│ Won/lost card   │       │ On-chain 1:1    │       4. Auto-advance
-│ 1-tap redemption│       │ tUSDC collateral│       to next story!
+│ 6. Round Settled│ ◀───│ 5. Market Settles│ ◀──────────────┘
+│ Won/lost card   │       │ On-chain 1:1    │       4. User swipes up
+│ 1-tap redemption│       │ tUSDC collateral│       when ready!
 └─────────────────┘       └─────────────────┘
 ```
 
-1. **Scroll Live Markets**: Users swipe vertically through live event contract windows (BTC, ETH, SOL, Macro, Ecosystem).
+1. **Scroll Live Markets**: Users swipe vertically through continuous live event contract windows (BTC, ETH, SOL, Macro, Ecosystem) using pure CSS scroll-snap.
 2. **Read Odds at a Glance**: Punchy headlines, implied probability percentage (`64% UP`), and live SVG odds sparklines.
-3. **Two-Tap Betting**: Tap UP or DOWN → choose amount ($1, $5, $20) → confirm.
-4. **Auto-Advance**: Order confirms on Shannon testnet and feed advances to the next story.
+3. **Two-Tap Betting**: Tap UP or DOWN → choose amount ($1, $5, $20) → confirm instant IOC taker order.
+4. **User-Paced Flow**: Order confirms with celebration in place; users swipe up whenever they are ready without artificial timers.
 5. **Portfolio & Win Rate**: Bottom nav provides access to open positions, win rate %, and settled history.
-6. **Resolved Story Callbacks**: When a wagered window closes, a celebratory story card appears directly in the feed with a 1-tap "Claim Payout" button.
+6. **Interleaved Round Callbacks**: When a wagered window closes, a celebratory card appears directly in the feed with a 1-tap "Claim Payout" button.
 
 ---
 
