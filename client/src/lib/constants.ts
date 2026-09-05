@@ -17,10 +17,17 @@ export const SOMNIA_SHANNON_CONFIG = {
   binaryModuleAddress: '0x3ecC694Cef705358864a646142ac17A90E29e388',
 };
 
-export const API_BASE_URL = window.location.origin.includes('5173')
+const envApi = import.meta.env.VITE_API_URL;
+export const API_BASE_URL = envApi
+  ? (envApi.endsWith('/api') ? envApi : `${envApi.replace(/\/$/, '')}/api`)
+  : window.location.origin.includes('5173')
   ? 'http://localhost:3001/api'
   : '/api';
 
-export const WS_BASE_URL = window.location.origin.includes('5173')
+const envWs = import.meta.env.VITE_WS_URL;
+export const WS_BASE_URL = envWs
+  ? envWs.replace(/\/$/, '')
+  : window.location.origin.includes('5173')
   ? 'ws://localhost:3001'
-  : `ws://${window.location.host}`;
+  : (window.location.protocol === 'https:' ? `wss://${window.location.host}` : `ws://${window.location.host}`);
+

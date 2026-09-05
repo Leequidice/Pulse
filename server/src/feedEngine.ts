@@ -4,6 +4,7 @@ import {
   DiscoveredMarket,
   OnChainMarketState,
 } from './chain.js';
+import { CONTRACT_ADDRESSES } from './config.js';
 
 export interface FeedCard {
   id: string;
@@ -395,7 +396,7 @@ export async function generateFeed(
         id: `market-dyn-p${page}-${i}-${Date.now().toString(36)}`,
         type: 'market',
         marketId: `0x0000000000000000000000000000000000000000000000000000000000014${page}${i}`,
-        pool: CONTRACT_ADDRESSES.binaryModule,
+        pool: CONTRACT_ADDRESSES.binaryModule || '0x3ecC694Cef705358864a646142ac17A90E29e388',
         asset: item.asset,
         category: item.cat,
         headline: item.headline,

@@ -179,8 +179,8 @@ export async function discoverLiveMarkets(maxWindows = 25): Promise<DiscoveredMa
  */
 export async function getMarketState(marketId: string, poolAddress: string): Promise<OnChainMarketState> {
   try {
-    const mo = await readSdk.client.getMarketOnchain(marketId);
-    const pool = poolAddress || mo.pool;
+    const mo = await readSdk.client.getMarketOnchain(marketId as Hex);
+    const pool = (poolAddress || mo.pool) as Hex;
 
     let bestBid = 0;
     let bestAsk = 1;
@@ -253,13 +253,13 @@ export async function getWalletBalances(
   try {
     const [yesBal, noBal] = await Promise.all([
       readSdk.client.getOutcomeBalance({
-        outcomeToken,
-        account: walletAddress,
+        outcomeToken: outcomeToken as Hex,
+        account: walletAddress as Hex,
         id: BigInt(yesId),
       }),
       readSdk.client.getOutcomeBalance({
-        outcomeToken,
-        account: walletAddress,
+        outcomeToken: outcomeToken as Hex,
+        account: walletAddress as Hex,
         id: BigInt(noId),
       }),
     ]);
@@ -294,7 +294,7 @@ export async function placeBetOrder(params: {
   try {
     // orderType: 2 = IOC (taker, must cross immediately)
     const orderRes = await sdk.trader.placeOrder({
-      pool: params.pool,
+      pool: params.pool as Hex,
       side,
       price,
       quantity,
@@ -327,8 +327,8 @@ export async function redeemWinningOutcome(params: {
   const baseAmount = BigInt(Math.round(params.amount * 1e6));
 
   const res = await sdk.trader.redeem({
-    marketId: params.marketId,
-    outcomeIdx: params.outcomeIdx,
+    marketId: params.marketId as Hex,
+    outcomeIdx: (params.outcomeIdx === 1 ? 1 : 0) as 0 | 1,
     amount: baseAmount,
   });
 
@@ -347,7 +347,7 @@ export async function mintOutcomeSet(params: {
   const amount = BigInt(Math.round(params.amountUsdc * 1e6));
 
   const res = await sdk.trader.mintSet({
-    pool: params.pool,
+    pool: params.pool as Hex,
     amount,
   });
 
