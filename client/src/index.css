@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  body {
+    background-color: #0a0b0e;
+    color: #f3f4f6;
+    font-family: 'Inter', sans-serif;
+    overscroll-behavior: none;
+  }
+}
+
+/* Custom Hide Scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism */
+.glass-panel {
+  background: rgba(20, 22, 29, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(26, 29, 38, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glow-up {
+  box-shadow: 0 0 25px rgba(0, 255, 163, 0.35);
+}
+
+.glow-down {
+  box-shadow: 0 0 25px rgba(255, 56, 100, 0.35);
+}
+
+.glow-gold {
+  box-shadow: 0 0 30px rgba(255, 184, 0, 0.35);
+}
+
+/* Story Snap Feed Container */
+.snap-feed-container {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+
+.snap-feed-item {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}

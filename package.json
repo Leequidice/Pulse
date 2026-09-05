@@ -1,0 +1,25 @@
+{
+  "name": "pulse-prediction-markets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pulse — Prediction Markets as a TikTok/Stories-style News Feed on Somnia Shannon testnet and DreamDEX Event Contracts",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "somnia",
+    "dreamdex",
+    "prediction-markets",
+    "event-contracts",
+    "news-feed"
+  ],
+  "author": "Pulse Team",
+  "license": "MIT"
+}
