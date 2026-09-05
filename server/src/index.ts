@@ -53,6 +53,10 @@ setInterval(() => {
 
 // --- API ENDPOINTS ---
 
+app.get('/', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', service: 'Pulse Server', network: NETWORK_CONFIG.name });
+});
+
 /**
  * GET /api/feed
  * Returns TikTok/Stories-style news feed cards.
@@ -317,9 +321,9 @@ app.get('/api/network-status', async (_req: Request, res: Response) => {
 });
 
 const PORT = NETWORK_CONFIG.port;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
-  console.log(`🚀 Pulse Server live on http://localhost:${PORT}`);
+  console.log(`🚀 Pulse Server live on http://0.0.0.0:${PORT}`);
   console.log(`🌐 Network: ${NETWORK_CONFIG.name} (Chain ID ${NETWORK_CONFIG.chainId})`);
   console.log(`🔗 RPC: ${NETWORK_CONFIG.rpcUrl}`);
   console.log(`💵 Collateral: tUSDC (${CONTRACT_ADDRESSES.testUsdc})`);
