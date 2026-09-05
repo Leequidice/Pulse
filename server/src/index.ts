@@ -61,10 +61,15 @@ setInterval(() => {
 app.get('/api/feed', async (req: Request, res: Response) => {
   try {
     const wallet = req.query.wallet as string | undefined;
-    const cards = await generateFeed(wallet);
+    const page = parseInt((req.query.page as string) || '1', 10);
+    const limit = parseInt((req.query.limit as string) || '8', 10);
+
+    const { cards, hasMore } = await generateFeed(wallet, page, limit);
     res.json({
       success: true,
       count: cards.length,
+      page,
+      hasMore,
       cards,
       network: {
         chainId: NETWORK_CONFIG.chainId,

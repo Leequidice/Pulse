@@ -221,7 +221,11 @@ const FEED_CACHE_TTL_MS = 12_000;
  * Generate the active news feed.
  * Merges on-chain discovered live markets with resolved story callbacks for the connected wallet.
  */
-export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> {
+export async function generateFeed(
+  walletAddress?: string,
+  page = 1,
+  limit = 8
+): Promise<{ cards: FeedCard[]; hasMore: boolean }> {
   const now = Math.floor(Date.now() / 1000);
   const nowMs = Date.now();
 
@@ -309,10 +313,9 @@ export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> 
     baseCards = marketCards;
   }
 
-  const feedCards: FeedCard[] = [];
-
-  // 3. Inject resolved user bets as "Story Callbacks" at the top of the user's feed
-  if (walletAddress) {
+  // Resolved user bets are interleaved at the top on page 1
+  const resolvedCards: FeedCard[] = [];
+  if (walletAddress && page === 1) {
     const userBets = getUserBets(walletAddress);
     for (const bet of userBets) {
       const isPastExpiry = now >= bet.expiryTimestamp;
@@ -323,7 +326,7 @@ export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> 
         const payout = isWinner ? Math.round(bet.amountUsdc * 1.85 * 100) / 100 : 0;
         const roi = isWinner ? 85 : -100;
 
-        feedCards.push({
+        resolvedCards.push({
           id: `resolved-${bet.id}`,
           type: 'resolved_story',
           marketId: bet.marketId,
@@ -331,8 +334,8 @@ export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> 
           asset: bet.asset,
           category: 'SOMNIA',
           headline: isWinner
-            ? `🎉 STORY UPDATE: You Called It! ${bet.asset} Settled ${winningSide}`
-            : `💔 STORY UPDATE: ${bet.asset} Settled ${winningSide}`,
+            ? `🎉 ROUND SETTLED: You Called It! ${bet.asset} Settled ${winningSide}`
+            : `💔 ROUND SETTLED: ${bet.asset} Settled ${winningSide}`,
           subheadline: isWinner
             ? `Payout: $${payout.toFixed(2)} tUSDC ready to redeem`
             : `Round ended. Defend your win streak in the next window!`,
@@ -345,7 +348,7 @@ export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> 
           expiryTimestamp: bet.expiryTimestamp,
           timeRemainingSeconds: 0,
           totalVolumeUsdc: bet.amountUsdc,
-          tags: ['#ResolvedStory', '#PayoutCallback', '#Somnia'],
+          tags: ['#MarketSettled', '#Payout', '#Somnia'],
           theme: isWinner ? THEMES[0] : THEMES[3],
           resolutionData: {
             userChoice: bet.direction,
@@ -362,6 +365,57 @@ export async function generateFeed(walletAddress?: string): Promise<FeedCard[]> 
     }
   }
 
-  // Combine resolved stories with base market cards
-  return [...feedCards, ...baseCards];
+  // Handle pagination across base cards, with infinite dynamic generation for subsequent pages
+  let returnMarketCards: FeedCard[] = [];
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+
+  if (startIndex < baseCards.length) {
+    returnMarketCards = baseCards.slice(startIndex, endIndex);
+  }
+
+  // If page exceeds available baseCards, generate continuous fresh high-frequency market items
+  if (returnMarketCards.length < limit) {
+    const needed = limit - returnMarketCards.length;
+    const extraAssets = [
+      { asset: 'BTC', cat: 'CRYPTO' as const, headline: 'Bitcoin 15M: Rapid Scalp Window Active' },
+      { asset: 'ETH', cat: 'DEFI' as const, headline: 'Ethereum 30M: Layer 1 Gas Rush Prediction' },
+      { asset: 'SOMNIA', cat: 'SOMNIA' as const, headline: 'Somnia 5M: Ultra-fast Sub-second Settlement Pool' },
+      { asset: 'SOL', cat: 'CRYPTO' as const, headline: 'Solana 15M: High-frequency Up/Down Odds' },
+      { asset: 'AI_AGENT', cat: 'TECH' as const, headline: 'Autonomous AI: Trading Volume Surge Test' },
+    ];
+
+    for (let i = 0; i < needed; i++) {
+      const item = extraAssets[(startIndex + i) % extraAssets.length];
+      const expiry = now + (600 + ((startIndex + i) % 5) * 600);
+      const prob = 45 + (((startIndex + i) * 17) % 25);
+      const theme = THEMES[(startIndex + i) % THEMES.length];
+
+      returnMarketCards.push({
+        id: `market-dyn-p${page}-${i}-${Date.now().toString(36)}`,
+        type: 'market',
+        marketId: `0x0000000000000000000000000000000000000000000000000000000000014${page}${i}`,
+        pool: CONTRACT_ADDRESSES.binaryModule,
+        asset: item.asset,
+        category: item.cat,
+        headline: item.headline,
+        subheadline: `Continuous continuous-feed market on Shannon Testnet`,
+        summary: `Live 1:1 tUSDC backed event contract with IOC taker fills. Sourced on-chain.`,
+        impliedProbUp: prob,
+        impliedProbDown: 100 - prob,
+        sparkline: generateSparkline(prob),
+        expiryTimestamp: expiry,
+        timeRemainingSeconds: expiry - now,
+        totalVolumeUsdc: 8500 + (prob * 120),
+        tags: [`#${item.asset}`, '#PulseFeed', '#Shannon'],
+        theme,
+      });
+    }
+  }
+
+  const combinedCards = [...resolvedCards, ...returnMarketCards];
+  return {
+    cards: combinedCards,
+    hasMore: true, // Always infinite in TikTok style!
+  };
 }

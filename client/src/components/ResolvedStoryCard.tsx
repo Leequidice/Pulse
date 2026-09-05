@@ -8,7 +8,7 @@ interface ResolvedStoryCardProps {
   card: FeedCard;
   walletAddress?: string;
   privateKey?: string;
-  onAdvance: () => void;
+  onAdvance?: () => void;
 }
 
 export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
@@ -81,7 +81,7 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
             }`}
           >
             {isWinner ? <Sparkles className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-            {isWinner ? 'STORY CALLBACK: WINNER' : 'STORY CALLBACK: SETTLED'}
+            {isWinner ? 'ROUND SETTLED: WINNER' : 'ROUND SETTLED'}
           </span>
         </div>
         <span className="text-xs font-mono text-gray-500 font-semibold">

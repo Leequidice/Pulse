@@ -1,15 +1,27 @@
 import { API_BASE_URL } from './constants';
 import { FeedCard, PortfolioStats, UserBetRecord } from '../types';
 
-export async function fetchFeed(walletAddress?: string): Promise<FeedCard[]> {
-  const url = walletAddress
-    ? `${API_BASE_URL}/feed?wallet=${encodeURIComponent(walletAddress)}`
-    : `${API_BASE_URL}/feed`;
+export async function fetchFeed(
+  walletAddress?: string,
+  page = 1,
+  limit = 8
+): Promise<{ cards: FeedCard[]; hasMore: boolean; page: number }> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  if (walletAddress) {
+    params.set('wallet', walletAddress);
+  }
 
-  const res = await fetch(url);
+  const res = await fetch(`${API_BASE_URL}/feed?${params.toString()}`);
   if (!res.ok) throw new Error(`Feed request failed: ${res.statusText}`);
   const data = await res.json();
-  return data.cards || [];
+  return {
+    cards: data.cards || [],
+    hasMore: data.hasMore ?? true,
+    page: data.page || page,
+  };
 }
 
 export async function placeBet(params: {

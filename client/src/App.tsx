@@ -19,6 +19,11 @@ export const App: React.FC = () => {
   });
 
   const [cards, setCards] = useState<FeedCard[]>([]);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(true);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+
   const [portfolioStats, setPortfolioStats] = useState<PortfolioStats>({
     totalWagered: 0,
     totalWon: 0,
@@ -30,9 +35,8 @@ export const App: React.FC = () => {
   });
   const [positions, setPositions] = useState<UserBetRecord[]>([]);
 
-  const [currentTab, setCurrentTab] = useState<'feed' | 'stories' | 'portfolio'>('feed');
+  const [currentTab, setCurrentTab] = useState<'feed' | 'portfolio'>('feed');
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
 
   // Initialize Wallet
   const initWallet = useCallback(async () => {
@@ -49,18 +53,43 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // Load Feed
-  const loadFeedData = useCallback(async (walletAddr?: string) => {
-    setIsLoadingFeed(true);
-    try {
-      const feedCards = await fetchFeed(walletAddr);
-      setCards(feedCards);
-    } catch (err) {
-      console.warn('Feed load note:', err);
-    } finally {
-      setIsLoadingFeed(false);
-    }
-  }, []);
+  // Load Feed with Pagination
+  const loadFeedData = useCallback(
+    async (walletAddr?: string, targetPage = 1, append = false) => {
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoadingFeed(true);
+      }
+
+      try {
+        const res = await fetchFeed(walletAddr, targetPage, 6);
+        if (append) {
+          setCards((prev) => {
+            const existingIds = new Set(prev.map((c) => c.id));
+            const newCards = res.cards.filter((c) => !existingIds.has(c.id));
+            return [...prev, ...newCards];
+          });
+        } else {
+          setCards(res.cards);
+        }
+        setHasMore(res.hasMore);
+        setPage(targetPage);
+      } catch (err) {
+        console.warn('Feed load note:', err);
+      } finally {
+        setIsLoadingFeed(false);
+        setIsLoadingMore(false);
+      }
+    },
+    []
+  );
+
+  // Infinite Scroll: Load Next Page
+  const handleLoadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+    loadFeedData(wallet.address || undefined, page + 1, true);
+  }, [isLoadingMore, hasMore, loadFeedData, wallet.address, page]);
 
   // Load Portfolio
   const loadPortfolioData = useCallback(async (walletAddr: string) => {
@@ -80,7 +109,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (wallet.address) {
-      loadFeedData(wallet.address);
+      loadFeedData(wallet.address, 1, false);
       loadPortfolioData(wallet.address);
     }
   }, [wallet.address, loadFeedData, loadPortfolioData]);
@@ -95,7 +124,7 @@ export const App: React.FC = () => {
           const msg = JSON.parse(event.data);
           if (msg.event === 'NEW_BET' || msg.event === 'RESOLVED') {
             if (wallet.address) {
-              loadFeedData(wallet.address);
+              loadFeedData(wallet.address, 1, false);
               loadPortfolioData(wallet.address);
             }
           }
@@ -108,16 +137,10 @@ export const App: React.FC = () => {
     };
   }, [wallet.address, loadFeedData, loadPortfolioData]);
 
-  // Filter cards for "stories" tab (resolved story callbacks only)
-  const displayedCards =
-    currentTab === 'stories'
-      ? cards.filter((c) => c.type === 'resolved_story')
-      : cards;
-
-  const resolvedStoriesCount = cards.filter((c) => c.type === 'resolved_story').length;
+  const resolvedSettledCount = cards.filter((c) => c.type === 'resolved_story').length;
 
   return (
-    <div className="relative w-screen h-screen bg-[#0a0b0e] text-white flex flex-col items-center justify-between overflow-hidden">
+    <div className="relative w-screen h-[100dvh] bg-[#0a0b0e] text-white flex flex-col items-center justify-between overflow-hidden select-none">
       {/* Top Floating Somnia Status Pill */}
       <header className="fixed top-2.5 inset-x-0 z-40 flex justify-center pointer-events-none">
         <div className="pointer-events-auto px-3.5 py-1 rounded-full glass-panel border border-white/10 flex items-center gap-2 text-[11px] font-mono shadow-lg backdrop-blur-md">
@@ -132,15 +155,18 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main View Container */}
-      <main className="relative w-full h-full flex-1 flex flex-col items-center justify-center overflow-hidden">
-        {currentTab === 'feed' || currentTab === 'stories' ? (
+      {/* Main View Container (Full Viewport Height) */}
+      <main className="relative w-full h-[100dvh] flex-1 flex flex-col items-center justify-center overflow-hidden">
+        {currentTab === 'feed' ? (
           <FeedView
-            cards={displayedCards}
+            cards={cards}
             walletAddress={wallet.address || ''}
             privateKey={wallet.privateKey}
             isLoading={isLoadingFeed}
-            onRefresh={() => wallet.address && loadFeedData(wallet.address)}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            onLoadMore={handleLoadMore}
+            onRefresh={() => wallet.address && loadFeedData(wallet.address, 1, false)}
           />
         ) : (
           <PortfolioView
@@ -165,7 +191,7 @@ export const App: React.FC = () => {
       {/* Bottom Navigation */}
       <BottomNav
         currentTab={currentTab}
-        resolvedCount={resolvedStoriesCount}
+        resolvedCount={resolvedSettledCount}
         onTabChange={setCurrentTab}
         onOpenWallet={() => setIsWalletModalOpen(true)}
       />
@@ -182,7 +208,7 @@ export const App: React.FC = () => {
         onWalletUpdated={() => {
           initWallet();
           if (wallet.address) {
-            loadFeedData(wallet.address);
+            loadFeedData(wallet.address, 1, false);
             loadPortfolioData(wallet.address);
           }
         }}

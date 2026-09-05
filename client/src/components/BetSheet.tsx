@@ -4,7 +4,6 @@ import {
   TrendingUp,
   TrendingDown,
   CheckCircle2,
-  Zap,
   ShieldAlert,
   ArrowRight,
 } from 'lucide-react';
@@ -18,7 +17,6 @@ interface BetSheetProps {
   walletAddress: string;
   privateKey?: string;
   onClose: () => void;
-  onSuccessAdvance: () => void;
 }
 
 const PRESET_AMOUNTS = [1, 5, 20, 50];
@@ -29,7 +27,6 @@ export const BetSheet: React.FC<BetSheetProps> = ({
   walletAddress,
   privateKey,
   onClose,
-  onSuccessAdvance,
 }) => {
   const [amount, setAmount] = useState<number>(5);
   const [customAmount, setCustomAmount] = useState<string>('');
@@ -85,17 +82,9 @@ export const BetSheet: React.FC<BetSheetProps> = ({
         origin: { y: 0.7 },
         colors: isUp ? ['#00FFA3', '#00F0FF'] : ['#FF3864', '#FFB800'],
       });
-
-      // Auto-advance to next market story after 1.4 seconds!
-      setTimeout(() => {
-        onSuccessAdvance();
-      }, 1400);
     } catch (err: any) {
       console.warn('Bet order notice (using simulated demo fill):', err.message);
       setIsSuccess(true);
-      setTimeout(() => {
-        onSuccessAdvance();
-      }, 1400);
     } finally {
       setIsSubmitting(false);
     }
@@ -141,24 +130,26 @@ export const BetSheet: React.FC<BetSheetProps> = ({
         </div>
 
         {isSuccess ? (
-          /* Confirmation Success State */
-          <div className="py-6 flex flex-col items-center text-center gap-3 animate-fade-in">
+          /* Confirmation Success State — User-paced, no programmatic auto-advance */
+          <div className="py-4 flex flex-col items-center text-center gap-3 animate-fade-in">
             <div className="w-16 h-16 rounded-full bg-pulse-up/20 border-2 border-pulse-up flex items-center justify-center text-pulse-up glow-up">
               <CheckCircle2 className="w-10 h-10 animate-pulse" />
             </div>
-            <h4 className="text-2xl font-black text-white">Bet Submitted!</h4>
+            <h4 className="text-2xl font-black text-white">Bet Placed!</h4>
             <p className="text-xs font-mono text-gray-300">
               IOC Taker Order matched against orderbook.
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-pulse-cyan font-mono mt-1">
-              <Zap className="w-3.5 h-3.5" />
-              <span>Auto-advancing to next market...</span>
-            </div>
             {txHash && (
               <span className="text-[10px] font-mono text-gray-500">
                 Tx: {txHash.slice(0, 10)}...{txHash.slice(-6)}
               </span>
             )}
+            <button
+              onClick={onClose}
+              className="mt-2 w-full py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider bg-pulse-up text-black hover:glow-up active:scale-95 transition-all"
+            >
+              Done — Swipe Up For Next Market
+            </button>
           </div>
         ) : (
           /* Bet Sizing Controls */
