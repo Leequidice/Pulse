@@ -58,7 +58,12 @@ setInterval(() => {
 // --- API ENDPOINTS ---
 
 app.get('/', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'Pulse Server', network: NETWORK_CONFIG.name });
+  res.json({
+    status: 'ok',
+    service: 'Pulse Server',
+    network: NETWORK_CONFIG.name,
+    version: '2.0.0-onchain-verified',
+  });
 });
 
 /**
