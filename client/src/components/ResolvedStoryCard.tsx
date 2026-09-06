@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Award, CheckCircle2, ArrowRight, DollarSign, Sparkles, AlertCircle } from 'lucide-react';
+import {
+  Award,
+  CheckCircle2,
+  ArrowRight,
+  DollarSign,
+  Sparkles,
+  ExternalLink,
+  ShieldAlert,
+  XCircle,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FeedCard } from '../types';
 import { redeemBet } from '../lib/api';
@@ -21,11 +30,15 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
   const isWinner = data?.isWinner ?? false;
   const [isClaimed, setIsClaimed] = useState(!data?.claimable);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [redeemTxHash, setRedeemTxHash] = useState<string | null>(null);
 
   const handleClaim = async () => {
-    if (!data?.claimable || isClaimed || !walletAddress) return;
+    if (!data?.claimable || isClaimed || !walletAddress || !privateKey) return;
 
     setIsClaiming(true);
+    setClaimError(null);
+
     try {
       // Fire celebratory confetti!
       confetti({
@@ -35,7 +48,7 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
         colors: ['#00FFA3', '#FFB800', '#00F0FF'],
       });
 
-      await redeemBet({
+      const res = await redeemBet({
         walletAddress,
         betId: card.id.replace('resolved-', ''),
         marketId: card.marketId,
@@ -44,10 +57,14 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
         privateKey,
       });
 
+      if (res.txHash) {
+        setRedeemTxHash(res.txHash);
+      }
       setIsClaimed(true);
-    } catch (err) {
-      console.warn('Redemption completed locally for demo:', err);
-      setIsClaimed(true);
+    } catch (err: any) {
+      console.error('On-chain redemption failed:', err);
+      setClaimError(err.message || 'On-chain redemption failed');
+      setIsClaimed(false);
     } finally {
       setIsClaiming(false);
     }
@@ -77,11 +94,11 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
             className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 border ${
               isWinner
                 ? 'bg-pulse-gold/15 text-pulse-gold border-pulse-gold/30'
-                : 'bg-gray-800 text-gray-400 border-gray-700'
+                : 'bg-rose-950/20 text-rose-400 border-rose-500/30'
             }`}
           >
-            {isWinner ? <Sparkles className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-            {isWinner ? 'ROUND SETTLED: WINNER' : 'ROUND SETTLED'}
+            {isWinner ? <Sparkles className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+            {isWinner ? 'ROUND SETTLED: WINNER' : 'ROUND SETTLED: MISSED'}
           </span>
         </div>
         <span className="text-xs font-mono text-gray-500 font-semibold">
@@ -96,26 +113,39 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
           className={`w-20 h-20 rounded-3xl flex items-center justify-center border-2 shadow-2xl ${
             isWinner
               ? 'bg-pulse-gold/20 border-pulse-gold text-pulse-gold glow-gold'
-              : 'bg-gray-800 border-gray-700 text-gray-400'
+              : 'bg-rose-950/30 border-rose-500/30 text-rose-400'
           }`}
         >
           {isWinner ? (
             <Award className="w-10 h-10 animate-bounce" />
           ) : (
-            <CheckCircle2 className="w-10 h-10" />
+            <XCircle className="w-10 h-10" />
           )}
         </div>
 
         <div>
           <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-            {isWinner ? 'You Called It!' : 'Window Closed'}
+            {isWinner ? 'You Called It!' : 'Prediction Missed'}
           </h2>
           <p className="text-sm font-medium text-gray-300 mt-2 max-w-xs mx-auto leading-relaxed">
             {isWinner
               ? `${card.asset} settled ${data?.winningOutcome} as predicted. Payout is backed 1:1 by collateral.`
-              : `${card.asset} closed ${data?.winningOutcome}. Your ${data?.userChoice} call missed this round.`}
+              : `${card.asset} settled ${data?.winningOutcome}. Your ${data?.userChoice} call did not win this round.`}
           </p>
         </div>
+
+        {/* Real On-Chain Transaction Explorer Link */}
+        {data?.txHash && (
+          <a
+            href={`https://shannon-explorer.somnia.network/tx/${data.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-pulse-cyan hover:underline flex items-center gap-1.5 transition-colors"
+          >
+            <span>Bet Tx: {data.txHash.slice(0, 8)}...{data.txHash.slice(-6)}</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
 
         {/* Payout & ROI Scoreboard */}
         {isWinner && (
@@ -138,6 +168,25 @@ export const ResolvedStoryCard: React.FC<ResolvedStoryCardProps> = ({
 
       {/* Action Footer */}
       <div className="relative z-10 flex flex-col gap-3">
+        {claimError && (
+          <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-300 font-mono flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <span className="leading-snug">{claimError}</span>
+          </div>
+        )}
+
+        {redeemTxHash && (
+          <a
+            href={`https://shannon-explorer.somnia.network/tx/${redeemTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs font-mono text-pulse-up hover:underline flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <span>Redemption Tx: {redeemTxHash.slice(0, 10)}...{redeemTxHash.slice(-6)}</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
+
         {isWinner ? (
           <button
             onClick={handleClaim}

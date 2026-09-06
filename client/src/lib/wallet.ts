@@ -73,7 +73,8 @@ export async function fetchBalances(address: string): Promise<{ stt: number; usd
       usdc: parseFloat(formatUnits(usdcUnits as bigint, 6)),
     };
   } catch (err) {
-    return { stt: 0.15, usdc: 25.0 }; // Sensible demo initial fallback
+    console.error('Failed to fetch on-chain balances:', err);
+    return { stt: 0, usdc: 0 };
   }
 }
 

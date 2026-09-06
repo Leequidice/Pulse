@@ -1,6 +1,7 @@
 import {
   discoverLiveMarkets,
   getMarketState,
+  checkMarketResolutionOnChain,
   DiscoveredMarket,
   OnChainMarketState,
 } from './chain.js';
@@ -314,16 +315,30 @@ export async function generateFeed(
     baseCards = marketCards;
   }
 
-  // Resolved user bets are interleaved at the top on page 1
+  // Resolved user bets are interleaved at the top on page 1 only if authoritatively resolved on-chain
   const resolvedCards: FeedCard[] = [];
   if (walletAddress && page === 1) {
     const userBets = getUserBets(walletAddress);
     for (const bet of userBets) {
-      const isPastExpiry = now >= bet.expiryTimestamp;
+      let isResolved = false;
+      let winningSide: 'UP' | 'DOWN' = 'UP';
+      let isWinner = false;
 
-      if (isPastExpiry || bet.status === 'RESOLVED') {
-        const winningSide = bet.winningOutcome || (bet.direction === 'UP' ? 'UP' : 'DOWN');
-        const isWinner = bet.direction === winningSide;
+      if (bet.marketId && bet.marketId.startsWith('0x') && bet.marketId.length === 66) {
+        try {
+          const res = await checkMarketResolutionOnChain(bet.marketId, walletAddress);
+          if (res.isResolved && res.winningOutcome) {
+            isResolved = true;
+            winningSide = res.winningOutcome;
+            isWinner = bet.direction === winningSide;
+          }
+        } catch {
+          // If read fails or market is not resolved yet, it is not resolved
+        }
+      }
+
+      // ONLY generate a resolved card if the market has actually resolved on-chain
+      if (isResolved) {
         const payout = isWinner ? Math.round(bet.amountUsdc * 1.85 * 100) / 100 : 0;
         const roi = isWinner ? 85 : -100;
 
@@ -336,20 +351,20 @@ export async function generateFeed(
           category: 'SOMNIA',
           headline: isWinner
             ? `🎉 ROUND SETTLED: You Called It! ${bet.asset} Settled ${winningSide}`
-            : `💔 ROUND SETTLED: ${bet.asset} Settled ${winningSide}`,
+            : `💔 ROUND SETTLED: MISSED. ${bet.asset} Settled ${winningSide}`,
           subheadline: isWinner
             ? `Payout: $${payout.toFixed(2)} tUSDC ready to redeem`
-            : `Round ended. Defend your win streak in the next window!`,
+            : `Your ${bet.direction} call lost. The market settled ${winningSide} on-chain.`,
           summary: isWinner
             ? `Your ${bet.direction} prediction on "${bet.headline}" won! Winning tokens redeem 1:1 for tUSDC collateral on Shannon testnet.`
-            : `Your ${bet.direction} prediction missed this round. Markets settle instantly on DreamDEX.`,
+            : `Your ${bet.direction} prediction missed. Verified on-chain via Somnia DreamDEX oracle.`,
           impliedProbUp: winningSide === 'UP' ? 100 : 0,
           impliedProbDown: winningSide === 'DOWN' ? 100 : 0,
           sparkline: winningSide === 'UP' ? [45, 52, 60, 75, 88, 100] : [55, 48, 40, 25, 12, 0],
           expiryTimestamp: bet.expiryTimestamp,
           timeRemainingSeconds: 0,
           totalVolumeUsdc: bet.amountUsdc,
-          tags: ['#MarketSettled', '#Payout', '#Somnia'],
+          tags: ['#MarketSettled', isWinner ? '#Payout' : '#Settled', '#Somnia'],
           theme: isWinner ? THEMES[0] : THEMES[3],
           resolutionData: {
             userChoice: bet.direction,

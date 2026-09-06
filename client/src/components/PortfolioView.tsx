@@ -6,6 +6,8 @@ import {
   Clock,
   DollarSign,
   Flame,
+  ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PortfolioStats, UserBetRecord } from '../types';
@@ -32,6 +34,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'open' | 'history'>('open');
   const [claimingBetId, setClaimingBetId] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   const openPositions = positions.filter((p) => p.status === 'OPEN');
   const resolvedPositions = positions.filter(
@@ -40,6 +43,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
   const handleClaim = async (bet: UserBetRecord) => {
     setClaimingBetId(bet.id);
+    setClaimError(null);
     try {
       confetti({
         particleCount: 60,
@@ -58,9 +62,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       });
 
       onRefresh();
-    } catch (err) {
-      console.warn('Redemption completed:', err);
-      onRefresh();
+    } catch (err: any) {
+      console.error('On-chain redemption error:', err);
+      setClaimError(err.message || 'On-chain redemption failed');
     } finally {
       setClaimingBetId(null);
     }
@@ -156,6 +160,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
       {/* Position List Content */}
       <div className="flex-1 flex flex-col gap-3">
+        {claimError && (
+          <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-300 font-mono flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <span className="leading-snug">{claimError}</span>
+          </div>
+        )}
+
         {activeTab === 'open' ? (
           openPositions.length === 0 ? (
             <div className="flex-1 py-12 flex flex-col items-center justify-center text-center gap-2 text-gray-400">
@@ -207,6 +218,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   <h4 className="text-sm font-bold text-white leading-snug">
                     {pos.headline}
                   </h4>
+
+                  {pos.txHash && (
+                    <a
+                      href={`https://shannon-explorer.somnia.network/tx/${pos.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-mono text-pulse-cyan hover:underline flex items-center gap-1 self-start"
+                    >
+                      <span>Tx: {pos.txHash.slice(0, 8)}...{pos.txHash.slice(-6)}</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
 
                   <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs font-mono">
                     <span className="text-gray-400">Wager: ${pos.amountUsdc} tUSDC</span>
@@ -261,6 +284,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                 <h4 className="text-sm font-bold text-white leading-snug">
                   {pos.headline}
                 </h4>
+
+                {pos.txHash && (
+                  <a
+                    href={`https://shannon-explorer.somnia.network/tx/${pos.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-mono text-pulse-cyan hover:underline flex items-center gap-1 self-start"
+                  >
+                    <span>Tx: {pos.txHash.slice(0, 8)}...{pos.txHash.slice(-6)}</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                )}
 
                 <div className="flex items-center justify-between pt-2 border-t border-white/5">
                   <span className="text-xs font-mono text-gray-400">

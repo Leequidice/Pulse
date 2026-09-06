@@ -6,7 +6,7 @@ import {
   probabilityToPrice,
   priceToProbability,
 } from '@somnia-chain/markets-sdk';
-import { createPublicClient, http, parseAbiItem, type Hex } from 'viem';
+import { createPublicClient, http, fallback, parseAbiItem, type Hex } from 'viem';
 import {
   NETWORK_CONFIG,
   CONTRACT_ADDRESSES,
@@ -43,10 +43,13 @@ export const MARKET_CREATED_EVENT = {
   anonymous: false,
 } as const;
 
-// Read-only public client directly against Somnia Shannon testnet
+// Read-only public client directly against Somnia Shannon testnet with RPC fallback
 export const publicClient = createPublicClient({
   chain: NETWORK_CONFIG.chain,
-  transport: http(NETWORK_CONFIG.rpcUrl),
+  transport: fallback([
+    http(NETWORK_CONFIG.rpcUrl, { retryCount: 2, timeout: 10_000 }),
+    http('https://50312.rpc.thirdweb.com', { retryCount: 2, timeout: 10_000 }),
+  ]),
 });
 
 // Cache for markets and orderbook
@@ -241,6 +244,124 @@ export async function getMarketState(marketId: string, poolAddress: string): Pro
   }
 }
 
+const ERC20_BALANCE_ABI = [
+  {
+    type: 'function',
+    name: 'balanceOf',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+/**
+ * Pre-flight on-chain verification that wallet holds sufficient tUSDC and STT gas.
+ */
+export async function checkWalletCanBet(
+  walletAddress: string,
+  amountUsdc: number
+): Promise<{ canBet: boolean; usdcBalance: number; sttBalance: number; error?: string }> {
+  try {
+    const [sttWei, usdcUnits] = await Promise.all([
+      publicClient.getBalance({ address: walletAddress as Hex }),
+      publicClient.readContract({
+        address: CONTRACT_ADDRESSES.testUsdc as Hex,
+        abi: ERC20_BALANCE_ABI,
+        functionName: 'balanceOf',
+        args: [walletAddress as Hex],
+      }),
+    ]);
+
+    const sttBalance = Number(sttWei) / 1e18;
+    const usdcBalance = Number(usdcUnits) / 1e6;
+
+    if (usdcBalance < amountUsdc) {
+      return {
+        canBet: false,
+        usdcBalance,
+        sttBalance,
+        error: `Insufficient tUSDC balance. You have ${usdcBalance.toFixed(2)} tUSDC, but the bet requires ${amountUsdc.toFixed(2)} tUSDC. Please fund your wallet.`,
+      };
+    }
+
+    if (sttBalance < 0.0005) {
+      return {
+        canBet: false,
+        usdcBalance,
+        sttBalance,
+        error: `Insufficient STT for gas. You have ${sttBalance.toFixed(4)} STT. Please claim STT from the Somnia faucet to pay network gas fees.`,
+      };
+    }
+
+    return {
+      canBet: true,
+      usdcBalance,
+      sttBalance,
+    };
+  } catch (err: any) {
+    return {
+      canBet: false,
+      usdcBalance: 0,
+      sttBalance: 0,
+      error: `Failed to verify on-chain balances: ${err.message}`,
+    };
+  }
+}
+
+export interface OnChainResolution {
+  marketId: string;
+  isResolved: boolean;
+  isVoided: boolean;
+  winningOutcome: 'UP' | 'DOWN' | null;
+  winningOutcomeIdx: number;
+  outcomeToken: string;
+  yesId: string;
+  noId: string;
+  userWinningBalance: number;
+}
+
+/**
+ * Authoritatively check if a market has been resolved by the oracle on-chain.
+ */
+export async function checkMarketResolutionOnChain(
+  marketId: string,
+  walletAddress?: string
+): Promise<OnChainResolution> {
+  const mo = await readSdk.client.getMarketOnchain(marketId as Hex);
+  const isResolved = Boolean(mo.isResolved);
+  const winningOutcomeIdx = Number(mo.winningOutcome || 0);
+  const winningOutcome: 'UP' | 'DOWN' | null = isResolved
+    ? (winningOutcomeIdx === 0 ? 'UP' : 'DOWN')
+    : null;
+
+  let userWinningBalance = 0;
+  if (walletAddress && isResolved) {
+    try {
+      const targetId = winningOutcomeIdx === 0 ? mo.yesId : mo.noId;
+      const bal = await readSdk.client.getOutcomeBalance({
+        outcomeToken: mo.outcomeToken,
+        account: walletAddress as Hex,
+        id: targetId,
+      });
+      userWinningBalance = Number(bal) / 1e6;
+    } catch {
+      userWinningBalance = 0;
+    }
+  }
+
+  return {
+    marketId,
+    isResolved,
+    isVoided: Boolean(mo.isVoided),
+    winningOutcome,
+    winningOutcomeIdx,
+    outcomeToken: mo.outcomeToken,
+    yesId: String(mo.yesId),
+    noId: String(mo.noId),
+    userWinningBalance,
+  };
+}
+
 /**
  * Read outcome token balances for a wallet
  */
@@ -273,6 +394,7 @@ export async function getWalletBalances(
   }
 }
 
+
 /**
  * Place an instant IOC (Immediate-or-Cancel) taker order for the two-tap feed bet.
  */
@@ -301,6 +423,10 @@ export async function placeBetOrder(params: {
       orderType: 2,
     });
 
+    if (!orderRes.hash) {
+      throw new Error('On-chain order transaction did not return a valid transaction hash');
+    }
+
     const fill = (orderRes.fills || [])[0];
     return {
       txHash: orderRes.hash,
@@ -322,7 +448,7 @@ export async function redeemWinningOutcome(params: {
   marketId: string;
   outcomeIdx: number; // 0 for UP/YES, 1 for DOWN/NO
   amount: number; // Outcome amount in whole tokens
-}): Promise<{ txHash?: string }> {
+}): Promise<{ txHash: string }> {
   const sdk = getMarketsSdk(params.privateKey);
   const baseAmount = BigInt(Math.round(params.amount * 1e6));
 
@@ -331,6 +457,10 @@ export async function redeemWinningOutcome(params: {
     outcomeIdx: (params.outcomeIdx === 1 ? 1 : 0) as 0 | 1,
     amount: baseAmount,
   });
+
+  if (!res.hash) {
+    throw new Error('On-chain redemption transaction did not return a valid transaction hash');
+  }
 
   return { txHash: res.hash };
 }
